@@ -1,16 +1,25 @@
-# React + Vite
+# UNICORE Academic Digital Ecosystem
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack enterprise academic platform that integrates secure online examinations, virtual classrooms, digital libraries, reservation management, AI-powered learning tools, analytics, and academic administration into a single scalable system.
 
-Currently, two official plugins are available:
+## 📖 Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+UNICORE is a software engineering project designed to demonstrate the development of a modern enterprise education platform using scalable architecture and industry-standard technologies.
 
-## React Compiler
+The project combines multiple academic modules into one application, including secure browser-based examinations, real-time video communication, digital library management, attendance tracking, classroom reservations, AI-assisted learning, analytics dashboards, and role-based access control.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The backend follows a modular architecture built with Node.js and Express.js, exposing REST APIs secured with JWT authentication. Real-time features are powered by Socket.IO and WebRTC, while Docker provides isolated environments for programming assessments. The platform is designed with cloud-ready deployment, CI/CD workflows, and reusable components to showcase enterprise software engineering practices.
 
-## Expanding the ESLint configuration
+## ✨ Highlights
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+* Modular enterprise architecture
+* Role-Based Access Control (RBAC)
+* Secure online examination workflow
+* Docker-based code execution sandbox
+* WebRTC virtual classroom
+* Socket.IO real-time communication
+* Digital library and reservation modules
+* AI-assisted learning features
+* Interactive analytics dashboards
+* JWT and Google OAuth authentication
+* Cloud-ready deployment with Docker and CI/CD
