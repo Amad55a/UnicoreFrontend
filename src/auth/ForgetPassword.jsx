@@ -1,9 +1,9 @@
 // src/features/auth/forgot-password/ForgotPassword.jsx
 import {
   Eye, EyeOff, ArrowRight, CheckCircle2, Loader2,
-  AlertCircle, Lock, ShieldCheck,
+  AlertCircle, Lock,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -17,7 +17,7 @@ const PW_CHECKS = [
   { id: "upper", test: (p) => /[A-Z]/.test(p) },
   { id: "lower", test: (p) => /[a-z]/.test(p) },
   { id: "digit", test: (p) => /[0-9]/.test(p) },
-  { id: "special", test: (p) => /[^A-Za-z0-9]/.test(p) },
+  { id: "special", test: (p) => /[@$!%*?&#]/.test(p) },
 ];
 
 function calcStrength(score, t) {
@@ -121,7 +121,7 @@ const StepPill = ({ n, active, done }) => (
 
 // ─── Error alert ──────────────────────────────────────────────────────────────
 const ErrorAlert = ({ msg, className = "" }) => (
-  <div className={`flex items-start gap-2.5 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl px-4 py-3 anim-fadeup mb-4 ${className}`}>
+  <div role="alert" className={`flex items-start gap-2.5 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl px-4 py-3 anim-fadeup mb-4 ${className}`}>
     <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
     <p className="text-xs text-red-600 dark:text-red-400 font-semibold">{msg}</p>
   </div>
@@ -131,57 +131,67 @@ const ErrorAlert = ({ msg, className = "" }) => (
 const ForgotPassword = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const resetLinkParams = new URLSearchParams(window.location.hash.slice(1));
+  const initialEmail = resetLinkParams.get("email") || "";
+  const initialCode = resetLinkParams.get("code") || "";
+  const hasResetLink = Boolean(initialEmail && /^\d{6}$/u.test(initialCode));
 
-  // step: "email" | "sending" | "verify" | "verifying" | "success"
-  const [step, setStep]               = useState("email");
-  const [loadingPhase, setLoadingPhase] = useState(0);
+  // step: "email" | "verify" | "success"
+  const [step, setStep]               = useState(hasResetLink ? "verify" : "email");
 
-  const [email, setEmail]           = useState("");
-  const [code, setCode]             = useState("");
+  const [email, setEmail]           = useState(initialEmail);
+  const [code, setCode]             = useState(hasResetLink ? initialCode : "");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPw, setConfirmPw]   = useState("");
   const [showPw, setShowPw]         = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const [emailError, setEmailError] = useState("");
   const [resetError, setResetError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
 
-  // Rotate loading text
   useEffect(() => {
-    if (step !== "sending" && step !== "verifying") return;
-    const iv = setInterval(() => setLoadingPhase((p) => (p + 1) % 3), 850);
-    return () => clearInterval(iv);
-  }, [step]);
-
-  const sendingTexts  = [t("auth.sendingResetCode1"), t("auth.sendingResetCode2"), t("auth.sendingResetCode3")];
-  const verifyingTexts = [t("auth.verifyingReset1"),   t("auth.verifyingReset2"),   t("auth.verifyingReset3")];
-  const loadingText   = step === "sending" ? sendingTexts[loadingPhase] : verifyingTexts[loadingPhase];
+    if (hasResetLink) {
+      navigate("/forgot-password", { replace: true });
+    }
+  }, [hasResetLink, navigate]);
 
   // ── Step 1: Send reset code ───────────────────────────────────────────────
   const handleSendCode = async (e) => {
     e.preventDefault();
+    if (isSending) return;
     if (!email) { setEmailError(t("auth.fillAllFields")); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email.trim())) {
+      setEmailError(t("auth.invalidEmail"));
+      return;
+    }
     if (!turnstileToken || turnstileToken === "dev-bypass") {
       setEmailError("Please complete Cloudflare verification before continuing.");
       return;
     }
     setEmailError("");
-    setStep("sending");
-    setLoadingPhase(0);
+    setIsSending(true);
 
     try {
       await api.post("/auth/forgot-password", { email, turnstileToken }, { withCredentials: true });
-      // Transition directly to verify — no extra animating state needed
+      setTurnstileToken("");
       setStep("verify");
     } catch (err) {
       setEmailError(err.response?.data?.message || t("auth.genericError"));
-      setStep("email");
+    } finally {
+      setIsSending(false);
+      setTurnstileToken("");
+      setTurnstileWidgetKey((key) => key + 1);
     }
   };
 
   // ── Step 2: Verify code + set new password ────────────────────────────────
   const handleReset = async (e) => {
     e.preventDefault();
+    if (isVerifying) return;
 
     if (!code || !newPassword || !confirmPw) {
       setResetError(t("auth.fillAllFields")); return;
@@ -201,8 +211,7 @@ const ForgotPassword = () => {
     }
 
     setResetError("");
-    setStep("verifying");
-    setLoadingPhase(0);
+    setIsVerifying(true);
 
     try {
       await api.post("/auth/reset-password", { email, code, newPassword });
@@ -211,24 +220,28 @@ const ForgotPassword = () => {
       navigate("/login");
     } catch (err) {
       setResetError(err.response?.data?.message || t("auth.resetFailed"));
-      setStep("verify");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
   const handleResend = async () => {
+    if (isSending || isVerifying) return;
     if (!turnstileToken || turnstileToken === "dev-bypass") {
       setResetError("Please complete Cloudflare verification before continuing.");
       return;
     }
-    setStep("sending");
-    setLoadingPhase(0);
+    setResetError("");
+    setIsSending(true);
     try {
       await api.post("/auth/forgot-password", { email, turnstileToken }, { withCredentials: true });
-      setStep("verify");
       toast.success(t("auth.codeResent"));
     } catch (err) {
       setResetError(err.response?.data?.message || t("auth.resendFailed"));
-      setStep("verify");
+    } finally {
+      setIsSending(false);
+      setTurnstileToken("");
+      setTurnstileWidgetKey((key) => key + 1);
     }
   };
 
@@ -266,36 +279,6 @@ const ForgotPassword = () => {
             </div>
           )}
 
-          {/* ── LOADING (sending / verifying) ───────────────────────────────── */}
-          {(step === "sending" || step === "verifying") && (
-            <div className="flex flex-col items-center text-center py-12 anim-fadeup">
-              <div className="relative w-16 h-16 mb-6">
-                <div className="absolute inset-0 rounded-full border-4 border-[#2C2DE0] dark:border-[#2C2DE0]" />
-                <div className="absolute inset-0 rounded-full border-4 border-[#2C2DE0] border-t-transparent animate-spin" />
-                {step === "sending" ? (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                    className="absolute inset-0 m-auto text-[#2C2DE0]">
-                    <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : (
-                  <ShieldCheck size={22} className="absolute inset-0 m-auto text-[#2C2DE0]" />
-                )}
-              </div>
-              <p className="text-base font-bold text-gray-900 dark:text-white min-h-6 anim-textswap">
-                {loadingText}
-              </p>
-              <div className="flex gap-1 mt-5">
-                {[0, 1, 2].map((i) => (
-                  <span key={i}
-                    className="w-2 h-2 rounded-full bg-[#2C2DE0] animate-bounce"
-                    style={{ animationDelay: `${i * 150}ms` }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ── STEP 1: EMAIL ────────────────────────────────────────────────── */}
           {step === "email" && (
             <div className="anim-fadeup">
@@ -316,31 +299,36 @@ const ForgotPassword = () => {
 
               <form onSubmit={handleSendCode} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="recovery-email" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("common.email")}
                   </label>
                   <input
+                    id="recovery-email"
                     type="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setEmailError(""); }}
                     placeholder={t("auth.emailPlaceholder")}
                     autoFocus
+                    autoComplete="email"
+                    aria-invalid={Boolean(emailError)}
                     className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
                   />
                 </div>
 
                 <div className="mt-1">
                   <TurnstileWidget
+                    key={turnstileWidgetKey}
                     onVerify={setTurnstileToken}
                     onExpire={() => setTurnstileToken("")}
                   />
                 </div>
 <button
   type="submit"
+  disabled={isSending}
+  aria-busy={isSending}
   className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#2C2DE0] text-white text-sm font-bold shadow-[0_4px_0_#1E1FAA] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1E1FAA] active:translate-y-1 active:shadow-none transition-all duration-150 group"
 >
-  {t("auth.sendResetCode")}
-  <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+  {isSending ? <><Loader2 size={16} className="animate-spin" /> Sending…</> : <>{t("auth.sendResetCode")}<ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" /></>}
 </button>
               </form>
 
@@ -385,16 +373,19 @@ const ForgotPassword = () => {
 
                 {/* Verification code */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="recovery-code" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("auth.resetCodeLabel")}
                   </label>
                   <input
+                    id="recovery-code"
                     type="text"
                     value={code}
                     onChange={(e) => { setCode(e.target.value); setResetError(""); }}
                     placeholder={t("auth.resetCodePlaceholder")}
                     maxLength={6}
                     autoFocus
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                     className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-mono font-bold tracking-[0.3em] text-center text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all uppercase"
                   />
                   <p className="text-[11px] text-gray-400">{t("auth.codeHint")}</p>
@@ -402,20 +393,23 @@ const ForgotPassword = () => {
 
                 {/* New password + strength meter */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="new-password" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("auth.newPasswordLabel")}
                   </label>
                   <div className="relative">
                     <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
+                      id="new-password"
                       type={showPw ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => { setNewPassword(e.target.value); setResetError(""); }}
                       placeholder={t("auth.passwordMinPlaceholder")}
                       className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 pr-11 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
                     />
-                    <button onClick={() => setShowPw((s) => !s)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <button type="button" onClick={() => setShowPw((s) => !s)}
+                      aria-label={showPw ? "Hide new password" : "Show new password"}
+                      aria-pressed={showPw}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded p-1 text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C2DE0] dark:text-gray-300 dark:hover:text-white transition-colors">
                       {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
@@ -425,18 +419,25 @@ const ForgotPassword = () => {
 
                 {/* Confirm password */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="confirm-new-password" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("auth.confirmPasswordLabel")}
                   </label>
                   <div className="relative">
                     <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
-                      type={showPw ? "text" : "password"}
+                      id="confirm-new-password"
+                      type={showConfirmPw ? "text" : "password"}
                       value={confirmPw}
                       onChange={(e) => { setConfirmPw(e.target.value); setResetError(""); }}
                       placeholder={t("auth.confirmPasswordLabel")}
-                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 pr-11 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
                     />
+                    <button type="button" onClick={() => setShowConfirmPw((s) => !s)}
+                      aria-label={showConfirmPw ? "Hide confirm password" : "Show confirm password"}
+                      aria-pressed={showConfirmPw}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded p-1 text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C2DE0] dark:text-gray-300 dark:hover:text-white transition-colors">
+                      {showConfirmPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
                   </div>
                   {/* Confirm match indicator */}
                   {confirmPw && (
@@ -456,11 +457,11 @@ const ForgotPassword = () => {
 {/* 1. Reset Password */}
 <button
   type="submit"
-  disabled={!code.trim() || !newPassword || !confirmPw || step === "verifying"}
+  disabled={!code.trim() || !newPassword || !confirmPw || isVerifying}
+  aria-busy={isVerifying}
   className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#2C2DE0] text-white text-sm font-bold shadow-[0_4px_0_#1E1FAA] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1E1FAA] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:pointer-events-none transition-all duration-150 group"
 >
-  {t("auth.resetPassword")}
-  <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+  {isVerifying ? <><Loader2 size={16} className="animate-spin" /> Resetting…</> : <>{t("auth.resetPassword")}<ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" /></>}
 </button>
 </form>
 
@@ -469,17 +470,24 @@ const ForgotPassword = () => {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   {t("auth.forgotDidntReceive")}
                 </p>
+                <TurnstileWidget
+                  key={turnstileWidgetKey}
+                  onVerify={setTurnstileToken}
+                  onExpire={() => setTurnstileToken("")}
+                />
                 <button
+                  type="button"
                   onClick={handleResend}
-                  className="text-xs font-semibold text-[#2C2DE0] dark:text-[#2C2DE0] hover:underline"
+                  disabled={isSending}
+                  className="text-xs font-semibold text-[#2C2DE0] dark:text-[#2C2DE0] hover:underline disabled:opacity-60"
                 >
-                  {t("auth.forgotResendCode")}
+                  {isSending ? <><Loader2 size={14} className="inline animate-spin mr-1" />Sending…</> : t("auth.forgotResendCode")}
                 </button>
               </div>
 
               {/* Back */}
               <button 
-                onClick={() => { setStep("email"); setCode(""); setResetError(""); }}
+                onClick={() => { setStep("email"); setCode(""); setResetError(""); setTurnstileToken(""); }}
                 className="w-full mt-4 text-center text-xs text-gray-400 hover:text-[#2C2DE0] dark:hover:text-[#2C2DE0] font-semibold transition-colors"
               >
                 ← {t("auth.forgotBackToEmail")}
@@ -522,7 +530,7 @@ const ForgotPassword = () => {
           </div>
 
           <div className="mt-8 bg-[#2C2DE0]/10 border border-[#2C2DE0]/20 rounded-2xl px-5 py-4 text-left">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#2C2DE0] mb-1">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-300 mb-1">
               {t("auth.forgotSecurityNote")}
             </p>
             <p className="text-xs text-gray-400 leading-relaxed">
@@ -553,17 +561,10 @@ const ForgotPassword = () => {
           from { width: 0%; }
           to   { width: 100%; }
         }
-        @keyframes textswap {
-          0%   { opacity: 0; transform: translateY(6px); }
-          15%  { opacity: 1; transform: translateY(0); }
-          85%  { opacity: 1; transform: translateY(0); }
-          100% { opacity: 0; transform: translateY(-6px); }
-        }
         .anim-fadeup   { animation: fadeup   0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
         .anim-slidein  { animation: slidein  0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
         .anim-scalein  { animation: scalein  0.45s cubic-bezier(0.34,1.56,0.64,1) forwards; }
         .anim-progress { animation: progress 2.4s linear forwards; }
-        .anim-textswap { animation: textswap 0.85s ease infinite; }
       `}</style>
     </div>
   );

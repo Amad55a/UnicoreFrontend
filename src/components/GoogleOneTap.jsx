@@ -6,18 +6,20 @@
  * Usage:
  *   <GoogleOneTap />   (anywhere inside <AuthProvider>)
  */
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api/client";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+let initializedClientId = "";
+let promptRequested = false;
+let activeCredentialHandler = null;
 
 export default function GoogleOneTap() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const initialized = useRef(false);
 
   const handleCredentialResponse = useCallback(
     async (response) => {
@@ -49,34 +51,31 @@ export default function GoogleOneTap() {
   );
 
   useEffect(() => {
-    // Don't show One Tap if user is already logged in
-    if (user || initialized.current) return;
+    if (user) return;
     if (!GOOGLE_CLIENT_ID) {
       console.warn("[GoogleOneTap] VITE_GOOGLE_CLIENT_ID not set. One Tap disabled.");
       return;
     }
 
+    activeCredentialHandler = handleCredentialResponse;
+
     const initOneTap = () => {
       if (!window.google?.accounts?.id) return;
-      initialized.current = true;
 
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        use_fedcm_for_prompt: true,
-      });
+      if (initializedClientId !== GOOGLE_CLIENT_ID) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => activeCredentialHandler?.(response),
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: true,
+        });
+        initializedClientId = GOOGLE_CLIENT_ID;
+      }
 
-      window.google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          console.info(
-            "[GoogleOneTap] prompt not shown:",
-            notification.getNotDisplayedReason?.() ||
-              notification.getSkippedReason?.()
-          );
-        }
-      });
+      if (promptRequested) return;
+      promptRequested = true;
+      window.google.accounts.id.prompt();
     };
 
     // Load the GSI script if not already present
@@ -98,10 +97,11 @@ export default function GoogleOneTap() {
     }
 
     return () => {
-      // Cancel the prompt when unmounting
-      try {
-        window.google?.accounts?.id?.cancel();
-      } catch (_) {}
+      window.google?.accounts?.id?.cancel();
+      promptRequested = false;
+      if (activeCredentialHandler === handleCredentialResponse) {
+        activeCredentialHandler = null;
+      }
     };
   }, [user, handleCredentialResponse]);
 

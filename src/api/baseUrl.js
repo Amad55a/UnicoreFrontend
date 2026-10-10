@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "https://api.unicores.tech/api/v1";
+const DEFAULT_BACKEND_URL = "https://api.unicores.tech";
 
 export const resolveApiBaseUrl = (provided = "", host = "") => {
   const raw = String(provided ?? "").trim();
@@ -21,9 +21,8 @@ export const resolveApiBaseUrl = (provided = "", host = "") => {
     return `/${cleaned}`;
   }
 
-  const isLocalHost =
-    typeof window !== "undefined" &&
-    /localhost|127\.0\.0\.1/i.test(host || window.location.hostname);
+  const currentHost = host || (typeof window !== "undefined" ? window.location.hostname : "");
+  const isLocalHost = /^(localhost|127\.0\.0\.1)$/iu.test(currentHost);
 
   return isLocalHost ? "/api/v1" : `${DEFAULT_BACKEND_URL}/api/v1`;
 };

@@ -3,7 +3,7 @@ import {
   Eye, EyeOff, ArrowRight, Loader2, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
 import UnicoreLogo from "@/FrontDoorSystem/components/Logo";
 import VerifyEmailStep from "./VerifyEmailStep";
@@ -127,16 +127,14 @@ const PasswordStrengthMeter = ({ password, t }) => {
 // ─── SignupPage ───────────────────────────────────────────────────────────────
 const SignupPage = () => {
   const { t } = useLanguage();
-  const navigate = useNavigate();
-
   // step: "register" | "sending" | "verify"
   const [step, setStep] = useState("register");
-  const [loadingPhase, setLoadingPhase] = useState(0);
 
   const [registerData, setRegisterData] = useState({ name: "", email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [registerError, setRegisterError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
   const [savedEmail, setSavedEmail] = useState("");
 
   // Clear form on mount / back-nav
@@ -147,13 +145,6 @@ const SignupPage = () => {
     return () => window.removeEventListener("pageshow", clear);
   }, []);
 
-  // Cycle loading text
-  useEffect(() => {
-    if (step !== "sending") return;
-    const iv = setInterval(() => setLoadingPhase((p) => (p + 1) % 3), 850);
-    return () => clearInterval(iv);
-  }, [step]);
-
   const handleRegisterChange = (e) => {
     setRegisterData((p) => ({ ...p, [e.target.name]: e.target.value }));
     setRegisterError("");
@@ -161,6 +152,7 @@ const SignupPage = () => {
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
+    if (step === "sending") return;
 
     if (!registerData.name || !registerData.email || !registerData.password) {
       setRegisterError(t("auth.fillAllFields"));
@@ -199,7 +191,6 @@ const SignupPage = () => {
   const submitRegister = async () => {
     setRegisterError("");
     setStep("sending");
-    setLoadingPhase(0);
 
     try {
       await api.post(
@@ -210,20 +201,12 @@ const SignupPage = () => {
       setSavedEmail(registerData.email);
       setStep("verify");
     } catch (err) {
-      if (err.response?.status === 400) {
-        setRegisterError(t("auth.accountExists"));
-      } else {
-        setRegisterError(err.response?.data?.message || t("auth.genericError"));
-      }
+      setRegisterError(err.response?.data?.message || t("auth.genericError"));
+      setTurnstileToken("");
+      setTurnstileWidgetKey((key) => key + 1);
       setStep("register");
     }
   };
-
-  const loadingTexts = [
-    t("auth.sendingCode1"),
-    t("auth.sendingCode2"),
-    t("auth.sendingCode3"),
-  ];
 
   // ── Hand off to verify step ──────────────────────────────────────────────
   if (step === "verify") {
@@ -259,34 +242,8 @@ const SignupPage = () => {
 
         <div className="w-full max-w-sm">
 
-          {/* ── SENDING ─────────────────────────────────────────────────────── */}
-          {step === "sending" && (
-            <div className="flex flex-col items-center text-center py-12 anim-fadeup">
-              <div className="relative w-16 h-16 mb-6">
-                <div className="absolute inset-0 rounded-full border-4 border-[#2C2DE0] dark:border-[#2C2DE0]" />
-                <div className="absolute inset-0 rounded-full border-4 border-[#2C2DE0] border-t-transparent animate-spin" />
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                  className="absolute inset-0 m-auto text-[#2C2DE0]">
-                  <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <p className="text-base font-bold text-gray-900 dark:text-white min-h-6 anim-textswap">
-                {loadingTexts[loadingPhase]}
-              </p>
-              <div className="flex gap-1 mt-5">
-                {[0, 1, 2].map((i) => (
-                  <span key={i}
-                    className="w-2 h-2 rounded-full bg-[#2C2DE0] animate-bounce"
-                    style={{ animationDelay: `${i * 150}ms` }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ── REGISTER FORM ────────────────────────────────────────────────── */}
-          {step === "register" && (
+          {(step === "register" || step === "sending") && (
             <div className="anim-fadeup">
               <h1 className="text-2xl font-black text-gray-900 dark:text-white">
                 {t("auth.createAccountTitle")}
@@ -316,7 +273,7 @@ const SignupPage = () => {
 
               {/* Error banner */}
               {registerError && (
-                <div className="mb-4 flex items-start gap-2.5 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl px-4 py-3 anim-fadeup">
+                <div role="alert" className="mb-4 flex items-start gap-2.5 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl px-4 py-3 anim-fadeup">
                   <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-red-600 dark:text-red-400 font-semibold">{registerError}</p>
                 </div>
@@ -326,10 +283,11 @@ const SignupPage = () => {
 
                 {/* Full name */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="signup-name" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("common.fullName")}
                   </label>
                   <input
+                    id="signup-name"
                     type="text" name="name"
                     value={registerData.name}
                     onChange={handleRegisterChange}
@@ -341,10 +299,11 @@ const SignupPage = () => {
 
                 {/* Email */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="signup-email" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("common.email")}
                   </label>
                   <input
+                    id="signup-email"
                     type="email" name="email"
                     value={registerData.email}
                     onChange={handleRegisterChange}
@@ -356,11 +315,12 @@ const SignupPage = () => {
 
                 {/* Password + strength meter */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="signup-password" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("common.password")}
                   </label>
                   <div className="relative">
                     <input
+                      id="signup-password"
                       type={showPassword ? "text" : "password"}
                       name="password"
                       value={registerData.password}
@@ -369,13 +329,15 @@ const SignupPage = () => {
                       autoComplete="new-password"
                       className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pr-11 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
                     />
-                    <button 
-                                       type="button"
-                                       onClick={() => setShowPassword((s) => !s)}
-                                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                     >
-                                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => !s)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded p-1 text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C2DE0] dark:text-gray-300 dark:hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
 
                   {/* ── Strength meter ── */}
@@ -384,6 +346,7 @@ const SignupPage = () => {
 
                 {/* Cloudflare Turnstile */}
                 <TurnstileWidget
+                  key={turnstileWidgetKey}
                   onVerify={setTurnstileToken}
                   onExpire={() => setTurnstileToken("")}
                   className="mt-1"
@@ -392,6 +355,7 @@ const SignupPage = () => {
 <button
   type="submit"
   disabled={step === "sending"}
+  aria-busy={step === "sending"}
   className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#2C2DE0] text-white text-sm font-bold shadow-[0_4px_0_#1E1FAA] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1E1FAA] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:pointer-events-none transition-all duration-150 group"
 >
   {step === "sending" ? (

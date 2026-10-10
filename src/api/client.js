@@ -1,8 +1,8 @@
 import axios from "axios";
 import { resolveApiBaseUrl } from "./baseUrl.js";
 
-const explicitBaseUrl = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "https://api.unicores.tech/api/v1";
-const normalizedBaseUrl = resolveApiBaseUrl(explicitBaseUrl);
+const explicitBaseUrl = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "";
+const normalizedBaseUrl = resolveApiBaseUrl(explicitBaseUrl, window.location.hostname);
 
 axios.defaults.baseURL = normalizedBaseUrl;
 axios.defaults.withCredentials = true;

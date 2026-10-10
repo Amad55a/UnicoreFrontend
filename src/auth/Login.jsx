@@ -1,4 +1,4 @@
-import { Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -56,19 +56,13 @@ const LoginPage = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [fieldErrors, setFieldErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingPhase, setLoadingPhase] = useState(0);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Rotate loading text
-  useEffect(() => {
-    if (!loading) return;
-    const iv = setInterval(() => setLoadingPhase((p) => (p + 1) % 3), 850);
-    return () => clearInterval(iv);
-  }, [loading]);
 
   useEffect(() => {
     const clear = () => setFormData({ email: "", password: "" });
@@ -84,12 +78,14 @@ const LoginPage = () => {
     navigate("/login", { replace: true, state: null });
   }, [location.state, navigate]);
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
     setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
+    setFieldErrors((p) => ({ ...p, [e.target.name]: "" }));
+  };
 
   const submitLogin = async () => {
+    if (loading) return;
     setLoading(true);
-    setLoadingPhase(0);
 
     try {
       const response = await api.post(
@@ -108,7 +104,15 @@ const LoginPage = () => {
       else navigate("/dashboard");
     } catch (err) {
       const message = err.response?.data?.message || t("auth.loginFailed");
-      toast.error(message);
+      setTurnstileToken("");
+      setTurnstileWidgetKey((key) => key + 1);
+      if (err.response?.status === 400 && /email/i.test(message)) {
+        setFieldErrors((current) => ({ ...current, email: message }));
+      } else if (err.response?.status === 400 && /password/i.test(message)) {
+        setFieldErrors((current) => ({ ...current, password: message }));
+      } else {
+        toast.error(message);
+      }
 
       if (err.response?.status === 403) {
         navigate("/verify-code", { state: { email: formData.email } });
@@ -120,9 +124,17 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
 
-    if (!formData.email || !formData.password) {
-      toast.error(t("auth.fillAllFields"));
+    const nextErrors = {};
+    if (!formData.email.trim()) nextErrors.email = t("auth.fillAllFields");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(formData.email.trim())) {
+      nextErrors.email = t("auth.invalidEmail");
+    }
+    if (!formData.password) nextErrors.password = t("auth.fillAllFields");
+    setFieldErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length) {
       return;
     }
 
@@ -140,12 +152,6 @@ const LoginPage = () => {
     );
     window.location.href = apiBase;
   };
-
-  const loadingTexts = [
-    t("auth.signingInPhase1"),
-    t("auth.signingInPhase2"),
-    t("auth.signingInPhase3"),
-  ];
 
   return (
     <div className="w-full min-h-screen flex flex-col md:flex-row bg-white dark:bg-black">
@@ -186,47 +192,59 @@ const LoginPage = () => {
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-4">
+              <form onSubmit={handleSubmit} noValidate autoComplete="off" className="flex flex-col gap-4">
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="login-email" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("common.email")}
                   </label>
                   <input
+                    id="login-email"
                     type="email"
                     name="email"
+                    required
                     value={formData.email}
                     onChange={handleChange}
                     placeholder={t("auth.emailPlaceholder")}
-                    autoComplete="off"
+                    autoComplete="email"
                     autoCapitalize="none"
                     spellCheck={false}
+                    aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
                     className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
                   />
+                  {fieldErrors.email && <p id="login-email-error" role="alert" className="text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <label htmlFor="login-password" className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {t("common.password")}
                   </label>
                   <div className="relative">
                     <input
+                      id="login-password"
                       type={showPassword ? "text" : "password"}
                       name="password"
+                      required
                       value={formData.password}
                       onChange={handleChange}
                       placeholder={t("auth.passwordPlaceholder")}
-                      autoComplete="new-password"
+                      autoComplete="current-password"
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
                       className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pr-11 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((s) => !s)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded p-1 text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C2DE0] dark:text-gray-300 dark:hover:text-white transition-colors"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {fieldErrors.password && <p id="login-password-error" role="alert" className="text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>}
                 </div>
 
                 <div className="flex justify-end -mt-2">
@@ -240,6 +258,7 @@ const LoginPage = () => {
 
                 {/* Cloudflare Turnstile */}
                 <TurnstileWidget
+                  key={turnstileWidgetKey}
                   onVerify={setTurnstileToken}
                   onExpire={() => setTurnstileToken("")}
                   className="mt-1"
@@ -249,12 +268,13 @@ const LoginPage = () => {
 <button
   type="submit"
   disabled={loading}
+  aria-busy={loading}
   className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#2C2DE0] text-white text-sm font-bold shadow-[0_4px_0_#1E1FAA] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1E1FAA] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 group"
 >
   {loading ? (
     <>
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
-      {loadingTexts[loadingPhase] || t("auth.signIn")}
+      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      <span>{t("auth.signingInPhase1")}</span>
     </>
   ) : (
     <>

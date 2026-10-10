@@ -1,9 +1,9 @@
-import axios from "axios";
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api/client";
+import { toast } from "sonner";
 
 const OAuthCallback = () => {
   const { t } = useLanguage();
@@ -16,12 +16,7 @@ const OAuthCallback = () => {
       const error = params.get("error");
       if (error) {
         console.error("OAuth callback error (redirect):", error);
-        try {
-          const { toast } = await import("sonner");
-          toast.error(decodeURIComponent(error));
-        } catch (e) {
-          console.error(e);
-        }
+        toast.error(error);
         navigate("/login", { replace: true });
         return;
       }
