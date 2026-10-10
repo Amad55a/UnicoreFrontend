@@ -38,7 +38,6 @@ const OAuthCallback = () => {
         navigate(destination, { replace: true });
       } catch (error) {
         if (attempt < 2 && error?.response?.status === 401) {
-          await new Promise((resolve) => setTimeout(resolve, 800));
           return completeGoogleLogin(attempt + 1);
         }
 

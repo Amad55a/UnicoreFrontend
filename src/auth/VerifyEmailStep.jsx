@@ -41,17 +41,14 @@ const VerifyEmailStep = ({ savedEmail, onBack }) => {
     setLoadingPhase(0);
 
     try {
-      await new Promise((r) => setTimeout(r, 2200));
       await api.post(
         "/auth/verify-email",
         { email: savedEmail, code: verifyCode },
         { withCredentials: true }
       );
       setStep("success");
-      setTimeout(() => {
-        toast.success(t("auth.accountVerifiedProceedToLogin"));
-        navigate("/login");
-      }, 2000);
+      toast.success(t("auth.accountVerifiedProceedToLogin"));
+      navigate("/login");
     } catch (err) {
       setVerifyError(err.response?.data?.message || t("auth.verificationFailed"));
       setStep("verify");
@@ -62,7 +59,6 @@ const VerifyEmailStep = ({ savedEmail, onBack }) => {
     setStep("sending");
     setLoadingPhase(0);
     try {
-      await new Promise((r) => setTimeout(r, 2200));
       await api.post(
         "/auth/resend-code",
         { email: savedEmail },

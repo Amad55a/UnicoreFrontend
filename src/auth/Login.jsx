@@ -162,39 +162,7 @@ const LoginPage = () => {
         </Link>
 
         <div className="w-full max-w-sm">
-
-          {/* ── LOADING STATE (replaces form area) ────────────────────────── */}
-          {loading && (
-            <div className="flex flex-col items-center text-center py-12 anim-fadeup">
-              <div className="relative w-16 h-16 mb-6">
-                <div className="absolute inset-0 rounded-full border-4 border-[#2C2DE0] dark:border-[#2C2DE0]" />
-                <div className="absolute inset-0 rounded-full border-4 border-[#2C2DE0] border-t-transparent animate-spin" />
-                {/* Key icon inside spinner */}
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                  className="absolute inset-0 m-auto text-[#2C2DE0]">
-                  <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <p className="text-base font-bold text-gray-900 dark:text-white min-h-6 anim-textswap">
-                {loadingTexts[loadingPhase]}
-              </p>
-
-              <div className="flex gap-1 mt-5">
-                {[0, 1, 2].map((i) => (
-                  <span key={i}
-                    className="w-2 h-2 rounded-full bg-[#2C2DE0] animate-bounce"
-                    style={{ animationDelay: `${i * 150}ms` }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── FORM (hidden while loading) ───────────────────────────────── */}
-          {!loading && (
-            <div className="anim-fadeup">
+          <div className="anim-fadeup">
               <h1 className="text-2xl font-black text-gray-900 dark:text-white">
                 {t("auth.welcomeBack")}
               </h1>
@@ -280,10 +248,20 @@ const LoginPage = () => {
                {/* ── Duolingo-style submit button ─────────────────────── */}
 <button
   type="submit"
-  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#2C2DE0] text-white text-sm font-bold shadow-[0_4px_0_#1E1FAA] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1E1FAA] active:translate-y-1 active:shadow-none transition-all duration-150 group"
+  disabled={loading}
+  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#2C2DE0] text-white text-sm font-bold shadow-[0_4px_0_#1E1FAA] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1E1FAA] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 group"
 >
-  {t("auth.signIn")}
-  <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+  {loading ? (
+    <>
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
+      {loadingTexts[loadingPhase] || t("auth.signIn")}
+    </>
+  ) : (
+    <>
+      {t("auth.signIn")}
+      <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+    </>
+  )}
 </button>
 
               </form>
@@ -295,8 +273,6 @@ const LoginPage = () => {
                 </Link>
               </p>
             </div>
-          )}
-
         </div>
       </div>
 

@@ -2,19 +2,19 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://api.unicores.site/api/$1"
+      "destination": "https://api.unicores.tech/api/$1"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "https://api.unicores.site/uploads/$1"
+      "destination": "https://api.unicores.tech/uploads/$1"
     },
     {
       "source": "/socket.io",
-      "destination": "https://api.unicores.site/socket.io"
+      "destination": "https://api.unicores.tech/socket.io"
     },
     {
       "source": "/socket.io/(.*)",
-      "destination": "https://api.unicores.site/socket.io/$1"
+      "destination": "https://api.unicores.tech/socket.io/$1"
     },
     {
       "source": "/(.*)",

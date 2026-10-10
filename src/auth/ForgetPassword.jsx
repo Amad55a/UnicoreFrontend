@@ -207,10 +207,8 @@ const ForgotPassword = () => {
     try {
       await api.post("/auth/reset-password", { email, code, newPassword });
       setStep("success");
-      setTimeout(() => {
-        toast.success(t("auth.resetSuccess"));
-        navigate("/login");
-      }, 2400);
+      toast.success(t("auth.resetSuccess"));
+      navigate("/login");
     } catch (err) {
       setResetError(err.response?.data?.message || t("auth.resetFailed"));
       setStep("verify");
@@ -372,7 +370,7 @@ const ForgotPassword = () => {
               </p>
 
               {/* Locked email badge */}
-              <div className="mt-4 mb-1 flex items-center gap-2.5 bg-[#2C2DE0] dark:bg-[#2C2DE0]/10 border border-[#2C2DE0] dark:border-[#2C2DE0]/30 rounded-xl px-4 py-2.5">
+              <div className="mt-4 mb-1 flex items-center gap-2.5  rounded-xl px-4 py-2.5">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" className="text-[#2C2DE0] shrink-0">
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                 </svg>

@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "https://api.unicores.site/api/v1";
+const DEFAULT_BACKEND_URL = "https://api.unicores.tech/api/v1";
 
 export const resolveApiBaseUrl = (provided = "", host = "") => {
   const raw = String(provided ?? "").trim();

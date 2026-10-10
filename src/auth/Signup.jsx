@@ -202,7 +202,6 @@ const SignupPage = () => {
     setLoadingPhase(0);
 
     try {
-      await new Promise((r) => setTimeout(r, 2200));
       await api.post(
         "/auth/register",
         { ...registerData, turnstileToken },
@@ -246,7 +245,7 @@ const SignupPage = () => {
     content="Create your UniCORE account to access the academic digital ecosystem."
   />
 
-  <link rel="canonical" href="https://unicores.site/signup" />
+  <link rel="canonical" href="https://unicores.tech/signup" />
 </Helmet>
 
       {/* ── Google One Tap (invisible popup) ─────────────────────────────── */}

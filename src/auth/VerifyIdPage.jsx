@@ -29,8 +29,6 @@ const normaliseName = (s = "") =>
     .replace(/dh/gi, "d")
     .replace(/\s+/g, " ");
 
-const CHECKING_MS = 2200;
-
 // Where each account type lands once verification finishes
 const dashboardPathFor = (accountType) =>
   accountType === "teacher" ? "/teacher/dashboard" : accountType === "student" ? "/student/dashboard" : "/dashboard";
@@ -114,8 +112,6 @@ const VerifyUniversityId = () => {
     setStep("checking1");
     setLoadingPhase(0);
 
-    await new Promise(r => setTimeout(r, CHECKING_MS));
-
     try {
       const { data } = await axios.post(
         "/api/v1/auth/university/check",
@@ -126,14 +122,11 @@ const VerifyUniversityId = () => {
       const resolvedData = data.data || data;
       setAccountType(resolvedData?.accountType ?? null);
 
-      // Animate transition to step 2
       setAnimating(true);
-      setTimeout(() => {
-        setStep("step2");
-        setAttempts(0);
-        setErrorMsg("");
-        setAnimating(false);
-      }, 380);
+      setStep("step2");
+      setAttempts(0);
+      setErrorMsg("");
+      setAnimating(false);
     } catch (err) {
       const code = err.response?.data?.code;
       const n = bumpAttempts();
@@ -155,8 +148,6 @@ const VerifyUniversityId = () => {
     setStep("checking2");
     setLoadingPhase(0);
 
-    await new Promise(r => setTimeout(r, CHECKING_MS));
-
     try {
       const { data } = await axios.post(
         "/api/v1/auth/university/confirm",
@@ -176,10 +167,7 @@ const VerifyUniversityId = () => {
       setUser(resolvedData.user);
       toast.success(copy.successTitle);
       setStep("success");
-      setTimeout(
-        () => navigate(dashboardPathFor(resolvedAccountType), { replace: true }),
-        2500
-      );
+      navigate(dashboardPathFor(resolvedAccountType), { replace: true });
     } catch (err) {
       const code = err.response?.data?.code;
       const n = bumpAttempts();

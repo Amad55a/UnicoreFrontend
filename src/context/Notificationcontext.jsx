@@ -98,7 +98,7 @@ export const NotificationProvider = ({ children }) => {
 
     fetchNotifications?.("all", true);
 
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_SERVER_URL || import.meta.env.VITE_API_URL || "https://api.unicores.site";
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_SERVER_URL || import.meta.env.VITE_API_URL || "https://api.unicores.tech";
     const socket = io(socketUrl, {
       auth:                 { token },
       transports:           ["websocket", "polling"],

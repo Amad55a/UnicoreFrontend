@@ -10,7 +10,7 @@ export default function DuolingoGoogleButton({ onSuccess, onError, label = "Cont
 
   const handleGoogleRedirect = () => {
     setLoading(true);
-    const backendUrl = import.meta.env.VITE_API_BASE_URL ?? "https://api.unicores.site/api/v1";
+    const backendUrl = import.meta.env.VITE_API_BASE_URL ?? "https://api.unicores.tech/api/v1";
     window.location.href = `${backendUrl}/auth/google`;
   };
 
