@@ -3,7 +3,7 @@ import {
   Eye, EyeOff, ArrowRight, CheckCircle2, Loader2,
   AlertCircle, Lock,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -147,6 +147,7 @@ const ForgotPassword = () => {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const resetInFlight = useRef(false);
 
   const [emailError, setEmailError] = useState("");
   const [resetError, setResetError] = useState("");
@@ -191,7 +192,7 @@ const ForgotPassword = () => {
   // ── Step 2: Verify code + set new password ────────────────────────────────
   const handleReset = async (e) => {
     e.preventDefault();
-    if (isVerifying) return;
+    if (resetInFlight.current) return;
 
     if (!code || !newPassword || !confirmPw) {
       setResetError(t("auth.fillAllFields")); return;
@@ -211,16 +212,17 @@ const ForgotPassword = () => {
     }
 
     setResetError("");
+    resetInFlight.current = true;
     setIsVerifying(true);
 
     try {
       await api.post("/auth/reset-password", { email, code, newPassword });
       setStep("success");
       toast.success(t("auth.resetSuccess"));
-      navigate("/login");
     } catch (err) {
       setResetError(err.response?.data?.message || t("auth.resetFailed"));
     } finally {
+      resetInFlight.current = false;
       setIsVerifying(false);
     }
   };
@@ -271,11 +273,11 @@ const ForgotPassword = () => {
                 {t("auth.passwordResetDone")}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                {t("auth.redirectingToLoginAfterReset")}
+                {t("auth.resetSuccess")}
               </p>
-              <div className="mt-8 w-full h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                <div className="h-full bg-[#2C2DE0] rounded-full anim-progress" />
-              </div>
+              <Link to="/login" className="mt-8 inline-flex items-center justify-center rounded-full bg-[#2C2DE0] px-6 py-3 text-sm font-bold text-white hover:bg-[#2425c5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C2DE0] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-black">
+                {t("auth.signInLink")}
+              </Link>
             </div>
           )}
 
@@ -311,7 +313,7 @@ const ForgotPassword = () => {
                     autoFocus
                     autoComplete="email"
                     aria-invalid={Boolean(emailError)}
-                    className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 focus:border-[#2C2DE0] transition-all"
+                    className="recovery-email-input w-full bg-white dark:bg-gray-900 border border-gray-500 dark:border-gray-500 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2C2DE0]/30 dark:focus:ring-[#A5A6FF]/50 focus:border-[#2C2DE0] dark:focus:border-[#A5A6FF] transition-all"
                   />
                 </div>
 
@@ -545,6 +547,22 @@ const ForgotPassword = () => {
 
       {/* Animations */}
       <style>{`
+        .recovery-email-input:autofill,
+        .recovery-email-input:-webkit-autofill,
+        .recovery-email-input:-webkit-autofill:hover,
+        .recovery-email-input:-webkit-autofill:focus {
+          -webkit-text-fill-color: #111827;
+          -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+          caret-color: #111827;
+        }
+        .dark .recovery-email-input:autofill,
+        .dark .recovery-email-input:-webkit-autofill,
+        .dark .recovery-email-input:-webkit-autofill:hover,
+        .dark .recovery-email-input:-webkit-autofill:focus {
+          -webkit-text-fill-color: #ffffff;
+          -webkit-box-shadow: 0 0 0 1000px #111827 inset;
+          caret-color: #ffffff;
+        }
         @keyframes fadeup {
           from { opacity: 0; transform: translateY(14px); }
           to   { opacity: 1; transform: translateY(0); }
